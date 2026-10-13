@@ -21,6 +21,9 @@ for i in range(50):
     raio = random.randint(1, 3)
     estrelas.append((x, y, raio))
 
+vidas=3
+fonte=pygame.font.Font("assets/font/PressStart2P.ttf",24)
+
 rodando = True
 while rodando:
     for evento in pygame.event.get():
@@ -33,6 +36,9 @@ while rodando:
 
     janela.blit(nave,(370,500))
 
+    coracoes=chr(9829) * vidas
+    texto_vidas=fonte.render(coracoes,True,(255,0,0))
+    janela.blit(texto_vidas,(10,10))
     pygame.display.update()
 
 pygame.quit()
