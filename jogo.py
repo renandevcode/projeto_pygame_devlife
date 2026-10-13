@@ -11,7 +11,8 @@ nave = pygame.image.load(
 ).convert_alpha()
 nave = pygame.transform.scale(nave, (60, 50))
 
-fundo = pygame.image.load("assets/img/starfield.png").convert()
+fundo = pygame.image.load(
+    "assets/img/starfield.png").convert()
 fundo = pygame.transform.scale(fundo, (800, 600))
 
 estrelas = []
@@ -30,6 +31,18 @@ fonte_fps=pygame.font.Font("assets/font/PressStart2P.ttf",16)
 nave_x = 370
 nave_y = 500
 velocidade = 300  
+
+imagem_meteoro = pygame.image.load(
+    "assets/img/meteorBrown_med1.png").convert_alpha()
+imagem_meteoro = pygame.transform.scale(imagem_meteoro, (50, 40))
+meteoros = []
+for i in range(5):
+    meteoro = {
+        "x": random.randint(0, 750),
+        "y": random.randint(-600, -40),
+        "velocidade": random.randint(100, 250),
+    }
+    meteoros.append(meteoro)
 
 rodando = True
 while rodando:
@@ -61,12 +74,39 @@ while rodando:
     # Mantém a nave inteira dentro da janela.
     nave_x = max(0, min(nave_x, 800 - nave.get_width()))
     nave_y = max(0, min(nave_y, 600 - nave.get_height()))
-    
+
+    retangulo_nave = nave.get_rect(
+        topleft=(round(nave_x), round(nave_y))
+    )
+
+    for meteoro in meteoros:
+        meteoro["y"] += meteoro["velocidade"] * dt
+
+        retangulo_meteoro = imagem_meteoro.get_rect(
+            topleft=(round(meteoro["x"]), round(meteoro["y"]))
+        )
+
+        colidiu = retangulo_nave.colliderect(retangulo_meteoro)
+
+        if colidiu:
+            vidas -= 1
+            if vidas <= 0:
+                rodando = False
+                break
+
+        # Reposiciona o meteoro após uma colisão ou ao sair da tela.
+        if colidiu or meteoro["y"] > 600:
+            meteoro["x"] = random.randint(0, 750)
+            meteoro["y"] = random.randint(-600, -40)
+            meteoro["velocidade"] = random.randint(100, 250)
 
     janela.blit(fundo, (0, 0))
     for x,y,raio in estrelas:
         pygame.draw.circle(janela,(255,255,255),(x,y),raio)
 
+    for meteoro in meteoros:
+        janela.blit(
+            imagem_meteoro,(round(meteoro["x"]), round(meteoro["y"])))
     janela.blit(nave,(round(nave_x),round(nave_y)))
 
     coracoes=chr(9829) * vidas
