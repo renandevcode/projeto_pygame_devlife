@@ -24,8 +24,12 @@ for i in range(50):
 vidas=3
 fonte=pygame.font.Font("assets/font/PressStart2P.ttf",24)
 
+relogio=pygame.time.Clock()
+fonte_fps=pygame.font.Font("assets/font/PressStart2P.ttf",16)
 rodando = True
 while rodando:
+    # Limita a taxa de quadros para evitar uso excessivo de CPU.
+    relogio.tick(60)
     for evento in pygame.event.get():
         if evento.type == pygame.QUIT:
             rodando = False
@@ -39,6 +43,15 @@ while rodando:
     coracoes=chr(9829) * vidas
     texto_vidas=fonte.render(coracoes,True,(255,0,0))
     janela.blit(texto_vidas,(10,10))
+
+    fps = relogio.get_fps()
+    texto_fps = fonte_fps.render(f"FPS: {fps:.0f}", True, (255, 255, 255))
+
+    posicao_fps = texto_fps.get_rect()
+    # Mantém uma margem de 10 pixels das bordas direita e inferior.
+    posicao_fps.bottomright = (790, 590)
+
+    janela.blit(texto_fps, posicao_fps)
     pygame.display.update()
 
 pygame.quit()
