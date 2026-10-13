@@ -2,6 +2,7 @@ import pygame
 import random
 
 pygame.init()
+pygame.mixer.init()
 
 janela = pygame.display.set_mode((800, 600))
 pygame.display.set_caption("Meu jogo")
@@ -44,6 +45,14 @@ for i in range(5):
     }
     meteoros.append(meteoro)
 
+pygame.mixer.music.load(
+    "assets/snd/tgfcoder-FrozenJam-SeamlessLoop.ogg"
+)
+
+# Repete a música durante toda a partida.
+pygame.mixer.music.play(-1)
+som_tiro = pygame.mixer.Sound("assets/snd/pew.wav")
+
 rodando = True
 while rodando:
     # Converte o tempo entre quadros de milissegundos para segundos
@@ -52,6 +61,9 @@ while rodando:
     for evento in pygame.event.get():
         if evento.type == pygame.QUIT:
             rodando = False
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_SPACE:
+                som_tiro.play()
 
     teclas = pygame.key.get_pressed()
 
