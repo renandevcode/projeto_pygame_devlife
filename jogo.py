@@ -62,6 +62,23 @@ class Meteoro(pygame.sprite.Sprite):
             self.reposicionar()
 
 
+class Tiro(pygame.sprite.Sprite):
+    def __init__(self, imagem, posicao):
+        super().__init__()
+        self.image = imagem
+        self.rect = self.image.get_rect(midbottom=posicao)
+        self.posicao_y = float(self.rect.y)
+        self.velocidade = 500
+
+    def update(self, dt):
+        self.posicao_y -= self.velocidade * dt
+        self.rect.y = round(self.posicao_y)
+
+        # Remove tiros que já saíram completamente da janela.
+        if self.rect.bottom < 0:
+            self.kill()
+
+
 class TelaInicial:
     def __init__(self, jogo):
         self.jogo = jogo
@@ -77,7 +94,7 @@ class TelaInicial:
         self.jogo.desenhar_fundo()
         self.jogo.desenhar_texto("Meu jogo", 200)
         self.jogo.desenhar_texto("ENTER para iniciar", 300)
-        self.jogo.desenhar_texto("Setas: mover | ESPACO: som de tiro", 370)
+        self.jogo.desenhar_texto("Setas: mover | ESPACO: atirar", 370)
 
 
 class TelaJogo:
@@ -86,17 +103,28 @@ class TelaJogo:
         self.vidas = 3
         self.nave = Nave(jogo.imagem_nave)
         self.naves = pygame.sprite.Group(self.nave)
+        self.tiros = pygame.sprite.Group()
         self.meteoros = pygame.sprite.Group()
         for _ in range(5):
             self.meteoros.add(Meteoro(jogo.imagem_meteoro))
 
     def tratar_evento(self, evento):
         if evento.type == pygame.KEYDOWN and evento.key == pygame.K_SPACE:
+            tiro = Tiro(self.jogo.imagem_tiro, self.nave.rect.midtop)
+            self.tiros.add(tiro)
             self.jogo.som_tiro.play()
 
     def atualizar(self, dt):
         self.naves.update(dt)
         self.meteoros.update(dt)
+        self.tiros.update(dt)
+
+        # Os dois True removem os tiros e os meteoros que colidiram.
+        pygame.sprite.groupcollide(self.tiros, self.meteoros, True, True)
+
+        # Cria novos meteoros acima da tela para manter a partida em andamento.
+        while len(self.meteoros) < 5:
+            self.meteoros.add(Meteoro(self.jogo.imagem_meteoro))
 
         # Mantém os sprites nos grupos para reutilizar os meteoros atingidos.
         colisoes = pygame.sprite.groupcollide(
@@ -113,6 +141,7 @@ class TelaJogo:
     def desenhar(self):
         self.jogo.desenhar_fundo()
         self.meteoros.draw(self.jogo.janela)
+        self.tiros.draw(self.jogo.janela)
         self.naves.draw(self.jogo.janela)
 
         coracoes = chr(9829) * self.vidas
@@ -155,6 +184,9 @@ class Jogo:
             str(ASSETS / "img/meteorBrown_med1.png")
         ).convert_alpha()
         self.imagem_meteoro = pygame.transform.scale(self.imagem_meteoro, (50, 40))
+        self.imagem_tiro = pygame.image.load(
+            str(ASSETS / "img/laserRed16.png")
+        ).convert_alpha()
         self.fundo = pygame.image.load(str(ASSETS / "img/starfield.png")).convert()
         self.fundo = pygame.transform.scale(self.fundo, (LARGURA, ALTURA))
 
