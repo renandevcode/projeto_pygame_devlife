@@ -79,6 +79,32 @@ class Tiro(pygame.sprite.Sprite):
             self.kill()
 
 
+class Explosao(pygame.sprite.Sprite):
+    def __init__(self, imagens, posicao):
+        super().__init__()
+        self.imagens = imagens
+        self.indice = 0
+        self.image = self.imagens[self.indice]
+        self.rect = self.image.get_rect(center=posicao)
+        self.tempo_acumulado = 0
+        self.tempo_por_imagem = 0.06
+
+    def update(self, dt):
+        self.tempo_acumulado += dt
+
+        # Avança todos os quadros necessários mesmo se o jogo ficar mais lento.
+        while self.tempo_acumulado >= self.tempo_por_imagem:
+            self.tempo_acumulado -= self.tempo_por_imagem
+            self.indice += 1
+            if self.indice >= len(self.imagens):
+                self.kill()
+                return
+
+            centro = self.rect.center
+            self.image = self.imagens[self.indice]
+            self.rect = self.image.get_rect(center=centro)
+
+
 class TelaInicial:
     def __init__(self, jogo):
         self.jogo = jogo
@@ -104,6 +130,7 @@ class TelaJogo:
         self.nave = Nave(jogo.imagem_nave)
         self.naves = pygame.sprite.Group(self.nave)
         self.tiros = pygame.sprite.Group()
+        self.explosoes = pygame.sprite.Group()
         self.meteoros = pygame.sprite.Group()
         for _ in range(5):
             self.meteoros.add(Meteoro(jogo.imagem_meteoro))
@@ -118,9 +145,16 @@ class TelaJogo:
         self.naves.update(dt)
         self.meteoros.update(dt)
         self.tiros.update(dt)
+        self.explosoes.update(dt)
 
         # Os dois True removem os tiros e os meteoros que colidiram.
-        pygame.sprite.groupcollide(self.tiros, self.meteoros, True, True)
+        colisoes_tiros = pygame.sprite.groupcollide(
+            self.tiros, self.meteoros, True, True
+        )
+        for meteoros_atingidos in colisoes_tiros.values():
+            for meteoro in meteoros_atingidos:
+                explosao = Explosao(self.jogo.imagens_explosao, meteoro.rect.center)
+                self.explosoes.add(explosao)
 
         # Cria novos meteoros acima da tela para manter a partida em andamento.
         while len(self.meteoros) < 5:
@@ -143,6 +177,7 @@ class TelaJogo:
         self.meteoros.draw(self.jogo.janela)
         self.tiros.draw(self.jogo.janela)
         self.naves.draw(self.jogo.janela)
+        self.explosoes.draw(self.jogo.janela)
 
         coracoes = chr(9829) * self.vidas
         texto = self.jogo.fonte_vidas.render(coracoes, True, (255, 0, 0))
@@ -187,6 +222,13 @@ class Jogo:
         self.imagem_tiro = pygame.image.load(
             str(ASSETS / "img/laserRed16.png")
         ).convert_alpha()
+        self.imagens_explosao = []
+        for indice in range(9):
+            imagem = pygame.image.load(
+                str(ASSETS / f"img/regularExplosion{indice:02d}.png")
+            ).convert_alpha()
+            imagem = pygame.transform.scale(imagem, (70, 70))
+            self.imagens_explosao.append(imagem)
         self.fundo = pygame.image.load(str(ASSETS / "img/starfield.png")).convert()
         self.fundo = pygame.transform.scale(self.fundo, (LARGURA, ALTURA))
 
