@@ -1,138 +1,220 @@
-import pygame
 import random
+from pathlib import Path
 
-pygame.init()
-pygame.mixer.init()
+import pygame
 
-janela = pygame.display.set_mode((800, 600))
-pygame.display.set_caption("Meu jogo")
 
-nave = pygame.image.load(
-    "assets/img/playerShip1_orange.png"
-).convert_alpha()
-nave = pygame.transform.scale(nave, (60, 50))
+LARGURA = 800
+ALTURA = 600
+ASSETS = Path(__file__).resolve().parent / "assets"
 
-fundo = pygame.image.load(
-    "assets/img/starfield.png").convert()
-fundo = pygame.transform.scale(fundo, (800, 600))
 
-estrelas = []
-for i in range(50):
-    x = random.randint(0, 799)
-    y = random.randint(0, 599)
-    raio = random.randint(1, 3)
-    estrelas.append((x, y, raio))
+class Nave(pygame.sprite.Sprite):
+    def __init__(self, imagem):
+        super().__init__()
+        self.image = imagem
+        self.rect = self.image.get_rect(topleft=(370, 500))
+        self.posicao = pygame.Vector2(self.rect.topleft)
+        self.velocidade = 300
 
-vidas=3
-fonte=pygame.font.Font("assets/font/PressStart2P.ttf",24)
+    def update(self, dt):
+        teclas = pygame.key.get_pressed()
+        velocidade_x = 0
+        velocidade_y = 0
 
-relogio=pygame.time.Clock()
-fonte_fps=pygame.font.Font("assets/font/PressStart2P.ttf",16)
+        if teclas[pygame.K_LEFT]:
+            velocidade_x -= self.velocidade
+        if teclas[pygame.K_RIGHT]:
+            velocidade_x += self.velocidade
+        if teclas[pygame.K_UP]:
+            velocidade_y -= self.velocidade
+        if teclas[pygame.K_DOWN]:
+            velocidade_y += self.velocidade
 
-nave_x = 370
-nave_y = 500
-velocidade = 300  
+        # Guarda casas decimais para que o movimento não dependa do FPS.
+        self.posicao.x += velocidade_x * dt
+        self.posicao.y += velocidade_y * dt
 
-imagem_meteoro = pygame.image.load(
-    "assets/img/meteorBrown_med1.png").convert_alpha()
-imagem_meteoro = pygame.transform.scale(imagem_meteoro, (50, 40))
-meteoros = []
-for i in range(5):
-    meteoro = {
-        "x": random.randint(0, 750),
-        "y": random.randint(-600, -40),
-        "velocidade": random.randint(100, 250),
-    }
-    meteoros.append(meteoro)
+        # Mantém a nave inteira dentro da janela.
+        self.posicao.x = max(0, min(self.posicao.x, LARGURA - self.rect.width))
+        self.posicao.y = max(0, min(self.posicao.y, ALTURA - self.rect.height))
+        self.rect.topleft = (round(self.posicao.x), round(self.posicao.y))
 
-pygame.mixer.music.load(
-    "assets/snd/tgfcoder-FrozenJam-SeamlessLoop.ogg"
-)
 
-# Repete a música durante toda a partida.
-pygame.mixer.music.play(-1)
-som_tiro = pygame.mixer.Sound("assets/snd/pew.wav")
+class Meteoro(pygame.sprite.Sprite):
+    def __init__(self, imagem):
+        super().__init__()
+        self.image = imagem
+        self.rect = self.image.get_rect()
+        self.reposicionar()
 
-rodando = True
-while rodando:
-    # Converte o tempo entre quadros de milissegundos para segundos
-    dt = relogio.tick(60) / 1000
+    def reposicionar(self):
+        # Começa acima da janela para entrar na tela aos poucos.
+        self.rect.x = random.randint(0, LARGURA - self.rect.width)
+        self.posicao_y = random.randint(-ALTURA, -self.rect.height)
+        self.rect.y = self.posicao_y
+        self.velocidade = random.randint(100, 250)
 
-    for evento in pygame.event.get():
-        if evento.type == pygame.QUIT:
-            rodando = False
-        if evento.type == pygame.KEYDOWN:
-            if evento.key == pygame.K_SPACE:
-                som_tiro.play()
+    def update(self, dt):
+        self.posicao_y += self.velocidade * dt
+        self.rect.y = round(self.posicao_y)
+        if self.rect.top > ALTURA:
+            self.reposicionar()
 
-    teclas = pygame.key.get_pressed()
 
-    velocidade_x = 0
-    velocidade_y = 0
+class TelaInicial:
+    def __init__(self, jogo):
+        self.jogo = jogo
 
-    if teclas[pygame.K_LEFT]:
-        velocidade_x -= velocidade
-    if teclas[pygame.K_RIGHT]:
-        velocidade_x += velocidade
-    if teclas[pygame.K_UP]:
-        velocidade_y -= velocidade
-    if teclas[pygame.K_DOWN]:
-        velocidade_y += velocidade
+    def tratar_evento(self, evento):
+        if evento.type == pygame.KEYDOWN and evento.key == pygame.K_RETURN:
+            self.jogo.tela = TelaJogo(self.jogo)
 
-    # Usa o tempo decorrido para manter o movimento independente do FPS.
-    nave_x += velocidade_x * dt
-    nave_y += velocidade_y * dt
+    def atualizar(self, dt):
+        pass
 
-    # Mantém a nave inteira dentro da janela.
-    nave_x = max(0, min(nave_x, 800 - nave.get_width()))
-    nave_y = max(0, min(nave_y, 600 - nave.get_height()))
+    def desenhar(self):
+        self.jogo.desenhar_fundo()
+        self.jogo.desenhar_texto("Meu jogo", 200)
+        self.jogo.desenhar_texto("ENTER para iniciar", 300)
+        self.jogo.desenhar_texto("Setas: mover | ESPACO: som de tiro", 370)
 
-    retangulo_nave = nave.get_rect(
-        topleft=(round(nave_x), round(nave_y))
-    )
 
-    for meteoro in meteoros:
-        meteoro["y"] += meteoro["velocidade"] * dt
+class TelaJogo:
+    def __init__(self, jogo):
+        self.jogo = jogo
+        self.vidas = 3
+        self.nave = Nave(jogo.imagem_nave)
+        self.naves = pygame.sprite.Group(self.nave)
+        self.meteoros = pygame.sprite.Group()
+        for _ in range(5):
+            self.meteoros.add(Meteoro(jogo.imagem_meteoro))
 
-        retangulo_meteoro = imagem_meteoro.get_rect(
-            topleft=(round(meteoro["x"]), round(meteoro["y"]))
+    def tratar_evento(self, evento):
+        if evento.type == pygame.KEYDOWN and evento.key == pygame.K_SPACE:
+            self.jogo.som_tiro.play()
+
+    def atualizar(self, dt):
+        self.naves.update(dt)
+        self.meteoros.update(dt)
+
+        # Mantém os sprites nos grupos para reutilizar os meteoros atingidos.
+        colisoes = pygame.sprite.groupcollide(
+            self.naves, self.meteoros, False, False
         )
+        for meteoros_atingidos in colisoes.values():
+            self.vidas = max(0, self.vidas - len(meteoros_atingidos))
+            for meteoro in meteoros_atingidos:
+                meteoro.reposicionar()
 
-        colidiu = retangulo_nave.colliderect(retangulo_meteoro)
+        if self.vidas == 0:
+            self.jogo.tela = TelaGameOver(self.jogo)
 
-        if colidiu:
-            vidas -= 1
-            if vidas <= 0:
-                rodando = False
-                break
+    def desenhar(self):
+        self.jogo.desenhar_fundo()
+        self.meteoros.draw(self.jogo.janela)
+        self.naves.draw(self.jogo.janela)
 
-        # Reposiciona o meteoro após uma colisão ou ao sair da tela.
-        if colidiu or meteoro["y"] > 600:
-            meteoro["x"] = random.randint(0, 750)
-            meteoro["y"] = random.randint(-600, -40)
-            meteoro["velocidade"] = random.randint(100, 250)
+        coracoes = chr(9829) * self.vidas
+        texto = self.jogo.fonte_vidas.render(coracoes, True, (255, 0, 0))
+        self.jogo.janela.blit(texto, (10, 10))
 
-    janela.blit(fundo, (0, 0))
-    for x,y,raio in estrelas:
-        pygame.draw.circle(janela,(255,255,255),(x,y),raio)
 
-    for meteoro in meteoros:
-        janela.blit(
-            imagem_meteoro,(round(meteoro["x"]), round(meteoro["y"])))
-    janela.blit(nave,(round(nave_x),round(nave_y)))
+class TelaGameOver:
+    def __init__(self, jogo):
+        self.jogo = jogo
 
-    coracoes=chr(9829) * vidas
-    texto_vidas=fonte.render(coracoes,True,(255,0,0))
-    janela.blit(texto_vidas,(10,10))
+    def tratar_evento(self, evento):
+        if evento.type == pygame.KEYDOWN and evento.key == pygame.K_RETURN:
+            # Uma nova tela cria uma partida com três vidas e novos meteoros.
+            self.jogo.tela = TelaJogo(self.jogo)
 
-    fps = relogio.get_fps()
-    texto_fps = fonte_fps.render(f"FPS: {fps:.0f}", True, (255, 255, 255))
+    def atualizar(self, dt):
+        pass
 
-    posicao_fps = texto_fps.get_rect()
-    # Mantém uma margem de 10 pixels das bordas direita e inferior.
-    posicao_fps.bottomright = (790, 590)
+    def desenhar(self):
+        self.jogo.desenhar_fundo()
+        self.jogo.desenhar_texto("GAME OVER", 240)
+        self.jogo.desenhar_texto("ENTER para recomecar", 330)
 
-    janela.blit(texto_fps, posicao_fps)
-    pygame.display.update()
 
-pygame.quit()
+class Jogo:
+    def __init__(self):
+        pygame.init()
+        pygame.mixer.init()
+        self.janela = pygame.display.set_mode((LARGURA, ALTURA))
+        pygame.display.set_caption("Meu jogo")
+        self.relogio = pygame.time.Clock()
+        self.rodando = True
+
+        self.imagem_nave = pygame.image.load(
+            str(ASSETS / "img/playerShip1_orange.png")
+        ).convert_alpha()
+        self.imagem_nave = pygame.transform.scale(self.imagem_nave, (60, 50))
+        self.imagem_meteoro = pygame.image.load(
+            str(ASSETS / "img/meteorBrown_med1.png")
+        ).convert_alpha()
+        self.imagem_meteoro = pygame.transform.scale(self.imagem_meteoro, (50, 40))
+        self.fundo = pygame.image.load(str(ASSETS / "img/starfield.png")).convert()
+        self.fundo = pygame.transform.scale(self.fundo, (LARGURA, ALTURA))
+
+        self.estrelas = []
+        for _ in range(50):
+            x = random.randint(0, LARGURA - 1)
+            y = random.randint(0, ALTURA - 1)
+            raio = random.randint(1, 3)
+            self.estrelas.append((x, y, raio))
+
+        fonte = str(ASSETS / "font/PressStart2P.ttf")
+        self.fonte_vidas = pygame.font.Font(fonte, 24)
+        self.fonte_texto = pygame.font.Font(fonte, 16)
+        self.som_tiro = pygame.mixer.Sound(str(ASSETS / "snd/pew.wav"))
+        pygame.mixer.music.load(
+            str(ASSETS / "snd/tgfcoder-FrozenJam-SeamlessLoop.ogg")
+        )
+        # A música continua tocando durante as trocas de tela.
+        pygame.mixer.music.play(-1)
+        self.tela = TelaInicial(self)
+
+    def desenhar_fundo(self):
+        self.janela.blit(self.fundo, (0, 0))
+        for x, y, raio in self.estrelas:
+            pygame.draw.circle(self.janela, (255, 255, 255), (x, y), raio)
+
+    def desenhar_texto(self, mensagem, y):
+        texto = self.fonte_texto.render(mensagem, True, (255, 255, 255))
+        posicao = texto.get_rect(center=(LARGURA // 2, y))
+        self.janela.blit(texto, posicao)
+
+    def desenhar_fps(self):
+        fps = self.relogio.get_fps()
+        texto = self.fonte_texto.render(f"FPS: {fps:.0f}", True, (255, 255, 255))
+        # Mantém uma margem de 10 pixels das bordas direita e inferior.
+        posicao = texto.get_rect(bottomright=(LARGURA - 10, ALTURA - 10))
+        self.janela.blit(texto, posicao)
+
+    def executar(self):
+        try:
+            while self.rodando:
+                # Limita a 60 FPS e converte o tempo decorrido para segundos.
+                dt = self.relogio.tick(60) / 1000
+                for evento in pygame.event.get():
+                    if evento.type == pygame.QUIT:
+                        self.rodando = False
+                        break
+                    self.tela.tratar_evento(evento)
+
+                if not self.rodando:
+                    break
+
+                self.tela.atualizar(dt)
+                self.tela.desenhar()
+                self.desenhar_fps()
+                pygame.display.update()
+        finally:
+            pygame.quit()
+
+
+if __name__ == "__main__":
+    jogo = Jogo()
+    jogo.executar()
