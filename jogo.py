@@ -26,19 +26,48 @@ fonte=pygame.font.Font("assets/font/PressStart2P.ttf",24)
 
 relogio=pygame.time.Clock()
 fonte_fps=pygame.font.Font("assets/font/PressStart2P.ttf",16)
+
+nave_x = 370
+nave_y = 500
+velocidade = 300  
+
 rodando = True
 while rodando:
-    # Limita a taxa de quadros para evitar uso excessivo de CPU.
-    relogio.tick(60)
+    # Converte o tempo entre quadros de milissegundos para segundos
+    dt = relogio.tick(60) / 1000
+
     for evento in pygame.event.get():
         if evento.type == pygame.QUIT:
             rodando = False
+
+    teclas = pygame.key.get_pressed()
+
+    velocidade_x = 0
+    velocidade_y = 0
+
+    if teclas[pygame.K_LEFT]:
+        velocidade_x -= velocidade
+    if teclas[pygame.K_RIGHT]:
+        velocidade_x += velocidade
+    if teclas[pygame.K_UP]:
+        velocidade_y -= velocidade
+    if teclas[pygame.K_DOWN]:
+        velocidade_y += velocidade
+
+    # Usa o tempo decorrido para manter o movimento independente do FPS.
+    nave_x += velocidade_x * dt
+    nave_y += velocidade_y * dt
+
+    # Mantém a nave inteira dentro da janela.
+    nave_x = max(0, min(nave_x, 800 - nave.get_width()))
+    nave_y = max(0, min(nave_y, 600 - nave.get_height()))
+    
 
     janela.blit(fundo, (0, 0))
     for x,y,raio in estrelas:
         pygame.draw.circle(janela,(255,255,255),(x,y),raio)
 
-    janela.blit(nave,(370,500))
+    janela.blit(nave,(round(nave_x),round(nave_y)))
 
     coracoes=chr(9829) * vidas
     texto_vidas=fonte.render(coracoes,True,(255,0,0))
